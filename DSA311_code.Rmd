@@ -1,0 +1,26 @@
+---
+title: "DSA311 project"
+output: html_document
+date: "2024-02-06"
+---
+
+#Read the csv file with data from 2017 onwards and filter for only those from year = 2023
+```{r}
+library(dplyr)
+data1 <- read.csv("2017-2024_resale_prices.csv", stringsAsFactors = TRUE)
+
+resale_price_2023 <- data1 |> 
+  mutate(year = substr(month,1,4)) |> 
+  filter(year == 2023)
+```
+
+#Data Cleaning
+```{r}
+#look at summary statistics 
+summary(resale_price_2023)
+
+#check for null values
+na_counts <- colSums(is.na(resale_price_2023))
+na_counts
+```
+
