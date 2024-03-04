@@ -25,10 +25,14 @@ def getcoordinates(address):
 unique_address_list = price_df["address"].unique() 
 unique_address_list_2 = price_df["address"].unique()[xxx:xxx] #if u want to extract records 1600-1800, change the [xxx:xxx] to [1600:1801]
 coord_list = []
-for address in unique_address_list_2: 
-    coord = getcoordinates(address)
-    print(address, coord)
-    coord_list.append(coord)
+for address in unique_address_list_2:
+    try:
+        coord = getcoordinates(address)
+        print(address, coord)
+        coord_list.append(coord)
+    except Exception as e:
+        print(f"Error occurred for address: {address}")
+        break
 
 
 #outputs a text file 
