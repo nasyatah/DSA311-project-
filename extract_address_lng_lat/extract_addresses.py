@@ -23,7 +23,7 @@ def getcoordinates(address):
     
 #use the get coordinate function to get coordinate of every address in unique_address_list
 unique_address_list = price_df["address"].unique() 
-unique_address_list_2 = price_df["address"].unique()[1400:] #records 1400 onwards, change accordingly
+unique_address_list_2 = price_df["address"].unique()[xxx:xxx] #if u want to extract records 1600-1800, change the [xxx:xxx] to [1600:1801]
 coord_list = []
 for address in unique_address_list_2: 
     coord = getcoordinates(address)
@@ -33,8 +33,8 @@ for address in unique_address_list_2:
 
 #outputs a text file 
 import csv
-coord_xxx_to_xxx = coord_list
+coord_xxx_to_xxx = coord_list #change xxx accordingly
 with open("coord_xxx_to_xxx", mode='w', newline='') as file:
     writer = csv.writer(file)
-    for row in coord_xxx_to_xxx:
+    for row in coord_xxx_to_xxx: #change xxx accordingly
         writer.writerow(row)
