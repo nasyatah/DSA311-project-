@@ -29,7 +29,7 @@ tqdm.tqdm.pandas()
 ##closestPrimarySchs.columns = ["closestPrimarySch", "distToPrimarySch", "timeToPrimarySch", "PrimarySchsIn10km"]
 ##hdbCoordinates.join(closestPrimarySchs).to_csv("./data/closestPrimarySchs.csv")
 
-closestMRTStations = hdbCoordinates[["lat", "long"]].iloc[1:20].progress_apply(lambda x: findClosestEntity(x.values, trans_df, dist_type = "walk"), axis = 1)
+closestMRTStations = hdbCoordinates[["lat", "long"]].iloc[201:1000].progress_apply(lambda x: findClosestEntity(x.values, trans_df, dist_type = "walk"), axis = 1)
 closestMRTStations = pd.DataFrame(list(closestMRTStations))
 closestMRTStations.columns = ["closestMRTStation", "distToMRTStation", "timeToMRTStation", "MRTStationsIn10km"]
-hdbCoordinates.join(closestMRTStations).to_csv("./data/closestMRTStations.test2.csv")
+hdbCoordinates.join(closestMRTStations).to_csv("./data/closestMRTStations.test4.csv")
