@@ -1,0 +1,12 @@
+0. Clustering (K-means/Hierarchical) alongside EDA - Nasyatah
+1. Multiple Linear Regression (Best subset selection) - Zhi Quan
+2. Ridge/Lasso regressions - Ting Yu
+3. Principal Component Analysis - Bharat
+4. Principal Component Regression and Partial Least Squares - Ting Yu
+5. Regression Trees (Bayesian Additive Regression Trees) - Nasyatah
+6. Bagging/Random Forest - Zhi Quan
+7. Gradient-Boosting - Nasyatah
+8. Support Vector Regression - Zhi Quan
+9. Splines and Local Regression - Ting Yu
+10. Bayesian Regression - Bharat
+11. Generalized Additive Models - Bharat
