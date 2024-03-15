@@ -2,6 +2,8 @@ import requests
 import json
 import pandas as pd
 
+import requests
+
 with open("oneMapAPIAuth.json") as auth_file:
     token_header = eval(auth_file.read())
 
@@ -17,17 +19,17 @@ def getcoordinates(address, auth = token_header):
         print(req.status_code)
 
 
-def getTravelDistTime(loc1, loc2, type = "pt", auth = token_header):
-    req =  f"https://www.onemap.gov.sg/api/public/routingsvc/route?start={loc1[0]}%2C{loc1[1]}&end={loc2[0]}%2C{loc2[1]}&routeType={type}&date=08-13-2023&time=12%3A00%3A00&mode=TRANSIT&numItineraries=1"
+def getTravelDistTime(loc1, loc2, dist_type = "pt", auth = token_header):
+    req =  f"https://www.onemap.gov.sg/api/public/routingsvc/route?start={loc1[0]}%2C{loc1[1]}&end={loc2[0]}%2C{loc2[1]}&routeType={dist_type}&date=08-13-2023&time=12%3A00%3A00&mode=TRANSIT&numItineraries=1"
     req = requests.get(req, headers = auth)
     if req.status_code == 200:
         resultsdict = json.loads(req.text)
-        if type == "pt":
+        if dist_type == "pt":
             itineraries = resultsdict["plan"]["itineraries"]
             if len(itineraries) > 0:
                 itinDist = sum([x["distance"] for x in itineraries[0]["legs"]])/1000
                 itinDura = itineraries[0]["duration"]/60
-        elif (type in ["walk", "drive"]) and (resultsdict["status"] == 0):
+        elif (dist_type in ["walk", "drive"]) and (resultsdict["status"] == 0):
             itinDist = resultsdict["route_summary"]["total_distance"]/1000
             itinDura = resultsdict["route_summary"]["total_time"]/60
         else:
@@ -39,7 +41,7 @@ def getTravelDistTime(loc1, loc2, type = "pt", auth = token_header):
 def findClosestEntity(focus, entity_df, dist_type = "drive", auth_token = token_header, radius = 10):
 
     try:
-        entityDistTime = entity_df[["lat", "long"]].apply(lambda x: getTravelDistTime(focus, x.values, type = dist_type, auth = auth_token), axis = 1)
+        entityDistTime = entity_df[["lat", "long"]].apply(lambda x: getTravelDistTime(focus, x.values, dist_type = dist_type, auth = auth_token), axis = 1)
         entityDistTime = pd.DataFrame(list(entityDistTime))
         minDist = entityDistTime.min().values[0]
         minTime = entityDistTime[entityDistTime[0] == minDist][1].values[0]
