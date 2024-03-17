@@ -1,3 +1,4 @@
+Seed: 444; Training obs: 8000
 0. Clustering (K-means/Hierarchical) alongside EDA - Nasyatah
 1. Multiple Linear Regression (Best subset selection) - Zhi Quan
 2. Ridge/Lasso regressions - Ting Yu
