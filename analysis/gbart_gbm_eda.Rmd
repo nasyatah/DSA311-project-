@@ -1,0 +1,376 @@
+---
+title: "DSA311_proj"
+output: html_document
+date: "2024-03-16"
+---
+
+#read the dataset and split into test/train set 
+```{r}
+resale <- read.csv("final_hdb_resale_2023.csv", stringsAsFactors = TRUE)
+variables_to_keep <- c("resale_price",
+  "month", "area", "lat", "long", "floor_area_sqm", "flat_model", 
+  "remaining_lease", "avg_storey", "no_of_rooms", "closestMall", 
+  "timeToMall", "mallsIn10km", "closestBeach", "timeToBeach", 
+  "beachesIn10km", "closestMRTStation", "timeToMRTStation", 
+  "MRTStationsIn10km", "closestPrimarySch", "timeToPrimarySch", 
+  "PrimarySchsIn10km", "below1000Pop", "below1500Pop", "below2000Pop", 
+  "below2500Pop", "below3000Pop", "below4000Pop", "below5000Pop", 
+  "below6000Pop", "below7000Pop", "below8000Pop", "below9000Pop", 
+  "below10000Pop", "below11000Pop", "below12000Pop", "above12000Pop"
+)
+
+resale <- subset(resale, select = variables_to_keep)
+
+
+set.seed(444)
+train <- sample(1:nrow(resale),8000)
+test <- -train
+```
+
+############
+1. EDA 
+############
+
+1.1 Price Distribution By Area 
+```{r}
+library(ggplot2)
+ggplot(resale, aes(x = area, y = resale_price)) +
+  geom_boxplot(fill = "skyblue") +
+  labs(title = "Price Distribution by Area", x = "Area", y = "Price") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+1.2 Distribution of flat type(based on number of rooms) across different areas 
+```{r}
+#Distribution of flat type across different areas 
+ggplot(resale, aes(x = area, fill = factor(no_of_rooms))) +
+  geom_bar() +
+  labs(title = "Distribution of Flat Types Across Different Areas",
+       x = "Area", y = "Count") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")
+```
+
+1.3 Scatter plot of time to amenities vs resale price 
+```{r}
+library(gridExtra)
+plot1 <- ggplot(resale, aes(x = timeToMall, y = resale_price)) +
+  geom_point() +
+  labs(title = "Time to Mall vs. Resale Price")+ 
+  geom_smooth(method = "lm", se = FALSE)
+
+plot2 <-ggplot(resale, aes(x = timeToBeach, y = resale_price)) +
+  geom_point() +
+  labs(title = "Time to Beach vs. Resale Price") + 
+  geom_smooth(method = "lm", se = FALSE)
+
+plot3 <- ggplot(resale, aes(x = timeToMRTStation, y = resale_price)) +
+  geom_point() +
+  labs(title = "Time to MRT Station vs. Resale Price") + 
+  geom_smooth(method = "lm", se = FALSE)
+
+final_plot <- grid.arrange(plot1, plot2, plot3, ncol = 3)
+
+# Display the final plot
+print(final_plot)
+```
+
+1.4 Correlation plot of numerical variables 
+```{r}
+#install.packages("corrplot")
+library(corrplot)
+
+#remove categorical data 
+correlation1 <- resale |>
+  select_if(~ !is.factor(.)) 
+
+cor_matrix <- cor(correlation1)
+corrplot(cor_matrix, method = "circle",tl.col = "black", tl.srt = 45)
+```
+```{r}
+
+library(corrplot)
+
+#remove categorical data 
+correlation1 <- resale |>
+  select_if(~ !is.factor(.)) 
+
+columns <- c(
+   "lat", "long", "floor_area_sqm", 
+  "remaining_lease", "avg_storey", "no_of_rooms", 
+  "timeToMall", "mallsIn10km", "timeToBeach", 
+  "beachesIn10km", "timeToMRTStation", 
+  "MRTStationsIn10km", "timeToPrimarySch", 
+  "PrimarySchsIn10km")
+
+correlation1 <- subset(correlation1, select = columns)
+
+cor_matrix <- cor(correlation1)
+corrplot(cor_matrix, method = "circle",tl.col = "black", tl.srt = 45)
+```
+
+############
+2. Clustering Analysis 
+############
+
+2.1 Data preprocessing for clustering 
+```{r}
+clustering_data <- resale
+#convert month values to integer from 1 -12 - Numeric Encoding 
+months <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+clustering_data$month <- match(resale$month, months)
+
+#do one hot encoding for all categorial variables - to be used in clustering 
+cols_to_encode <- clustering_data |>
+  select_if(~ is.factor(.)) |>
+  names()
+
+clustering_data[,cols_to_encode] <- sapply(clustering_data[, cols_to_encode], function(x) as.integer(x))
+
+#standardize the columns for clustering
+clustering_data <- as.data.frame(scale(clustering_data))
+#head(clustering_data)
+
+```
+2.2 Kmeans clustering 
+```{r}
+library(stats)
+library(cluster)
+#range of k values to try
+k_values <- 1:15
+wcss <- numeric(length(k_values))
+silhouette_scores <- numeric(length(k_values))
+
+for (k in k_values) {
+  kmeans_result <- kmeans(clustering_data, centers = k)
+  wcss[k] <- kmeans_result$tot.withinss
+  ssi <- summary(silhouette(kmeans_result$cluster, dist(clustering_data)))
+  silhouette_scores[k] <- ssi[4][[1]]
+}
+
+# Plot the elbow curve
+plot(k_values, wcss, type = "b", pch = 19, frame = FALSE, 
+     xlab = "Number of clusters (k)", ylab = "Total within-cluster sum of squares (WCSS)",
+     main = "Elbow Method for Optimal k")
+
+#Plot the silhouette score 
+plot(k_values, silhouette_scores, type = "b", 
+     xlab = "Number of Clusters (k)", ylab = "Silhouette Score",
+     main = "Silhouette Score vs. Number of Clusters")
+
+#clusters are not well separated based on silhouette score and wcss
+silhouette_scores[which.max(silhouette_scores)]
+wcss[which.min(wcss)]
+```
+
+2.3 Hierarchical clustering
+```{r}
+library(cluster)
+h_values <- 1:15
+
+silhouette_scores <- numeric(length(h_values))
+
+for (h in h_values){
+  cl <- hclust(dist(clustering_data), method= "complete")
+  hc_cluster <- cutree(cl, h = h)
+  ssi <- summary(silhouette(hc_cluster, dist(clustering_data)))
+  silhouette_scores[h]<- ssi[4][[1]]
+}
+
+plot(h_values, silhouette_scores, type = "b", 
+     xlab = "Number of Clusters (h)", ylab = "Silhouette Score",
+     main = "Silhouette Score vs. Number of Clusters (Hierarchical)")
+silhouette_scores[which.max(silhouette_scores)] #0.3041983
+
+```
+############
+Tree Based Models 
+############
+
+#Data pre processing for BART/Gradient boosting
+```{r}
+library(dplyr)
+#Integer Encoding 
+new_df <- resale
+str(new_df)
+# Do one hot encoding for all categorical variables - to be used in clustering  
+cols_to_encode <- new_df |>   
+  select_if(~ is.factor(.)) |>   
+  names()  
+integer_encoding_df <- new_df
+integer_encoding_df[,cols_to_encode] <- sapply(integer_encoding_df[, cols_to_encode], function(x) as.integer(x))
+#head(integer_encoding_df)
+#Target Encoding 
+# Do target encoding for all categorical variables - to be used in clustering
+target_encode <- function(data, column, target) {
+  # Check if column exists in data
+  if (!(column %in% names(data))) {
+    stop("Column not found in the data frame.")
+  }
+  # Check if target variable exists in data
+  if (!(target %in% names(data))) {
+    stop("Target variable not found in the data frame.")
+  }
+  # Check if column is a factor
+  if (!is.factor(data[[column]])) {
+    stop("Column is not a factor.")
+  }
+  # Check if column and target have the same length
+  if (length(data[[column]]) != length(data[[target]])) {
+    stop("Column and target variable must have the same length.")
+  }
+  # Calculate mean of target variable for each category in the specified column
+  encoding <- tapply(data[[target]], data[[column]], mean)
+  # Map the mean values to the corresponding categories and assign to a new column
+  data[[paste0(column, "_encoded")]] <- encoding[data[[column]]]
+  # Return the modified data frame with target-encoded column
+  return(data)
+} # function to do target encoding
+cols_to_encode <- names(new_df)[sapply(new_df, is.factor)] # Select categorical columns for target encoding
+for (col in cols_to_encode) {
+  new_df <- target_encode(data=new_df, column=col,target="resale_price")
+} # Perform target encoding
+factor_cols <- sapply(new_df, is.factor)
+target_encoding_df <- new_df[, !factor_cols]
+#head(target_encoding_df)
+```
+
+
+#Bayesian Additive Regression Trees
+```{r}
+#install.packages("BART")
+library(BART)
+
+#Integer Encoding
+X <- subset(integer_encoding_df, select = -resale_price)
+y <- integer_encoding_df$resale_price
+Xtrain <- X[train,]
+ytrain <- y[train]
+Xtest <- X[test,]
+ytest <- y[test]
+
+bartfit <- gbart(Xtrain,ytrain,x.test = Xtest) #use default setting
+yhat.bart <- bartfit$yhat.test.mean
+(mean((ytest - yhat.bart)^2))^0.5
+
+# Target Encoding
+X <- subset(target_encoding_df, select = -resale_price)
+y <- target_encoding_df$resale_price
+Xtrain <- X[train,]
+ytrain <- y[train]
+Xtest <- X[test,]
+ytest <- y[test]
+
+bartfit <- gbart(Xtrain,ytrain,x.test = Xtest) #use default setting
+yhat.bart <- bartfit$yhat.test.mean
+(mean((ytest - yhat.bart)^2))^0.5
+
+#No encoding of categorical variable
+X <- subset(resale, select = -resale_price)
+y <- resale$resale_price
+Xtrain <- X[train,]
+ytrain <- y[train]
+Xtest <- X[test,]
+ytest <- y[test]
+
+bartfit <- gbart(Xtrain,ytrain,x.test = Xtest) #use default setting
+yhat.bart <- bartfit$yhat.test.mean
+(mean((ytest - yhat.bart)^2))^0.5
+
+```
+
+#Gradient Boosting Regressor
+```{r}
+set.seed(444)
+train <- sample(1:nrow(resale),8000)
+test <- -train
+#install.packages("gbm")
+library(gbm)
+
+boosting <- function(data, interaction.depth, n.trees) {
+  boost.resale <- gbm(resale_price ~., data = data[train,], distribution = "gaussian", n.trees = n.trees, interaction.depth = interaction.depth)
+  yhat.boost <- predict(boost.resale, newdata = data[test,], n.trees = n.trees) #default lambda = 0.001
+  return((mean((yhat.boost - data[test,"resale_price"])^2))^0.5)
+}
+
+#No encoding of categorical variables
+boosting(resale, 4, 1000)
+boosting(resale, 4, 2000)
+boosting(resale, 4, 3000)
+boosting(resale, 2, 1000)
+boosting(resale, 4, 2500)
+
+
+#Integer Encoding
+boosting(integer_encoding_df, 4, 1000)
+boosting(integer_encoding_df, 4, 2000)
+boosting(integer_encoding_df, 4, 3000)
+boosting(integer_encoding_df, 2, 1000)
+boosting(integer_encoding_df, 4, 2500)
+
+
+#Target Encoding
+boosting(target_encoding_df, 4, 1000)
+boosting(target_encoding_df, 4, 2000)
+boosting(target_encoding_df, 4, 3000)
+boosting(target_encoding_df, 2, 1000)
+boosting(target_encoding_df, 4, 2500) 
+
+
+
+```
+
+```{r}
+#final model with all the data 
+library(gbm)
+boost.resale <- gbm(resale_price ~., data = target_encoding_df, distribution = "gaussian", n.trees = 2500, interaction.depth = 4)
+summary(boost.resale)
+yhat.boost <- predict(boost.resale, newdata = target_encoding_df[test,], n.trees = 2500) #default lambda = 0.001
+(mean((yhat.boost - target_encoding_df[test,"resale_price"])^2))^0.5
+
+```
+
+
+```{r}
+#predicting the price of a flat with the final model 
+
+new_data = data.frame(month = "Jan", area = "Bukit Merah" , lat = 1.286492541, long = 103.8214336, floor_area_sqm = 83 , flat_model = "Model A", remaining_lease = 94, avg_storey= 20, no_of_rooms = 4 ,closestMall = "Tiong Bahru Plaza", timeToMall = 2.216666667, mallsIn10km = 69 , closestBeach = "Palawan Beach", timeToBeach = 14.16666667, beachesIn10km = 5, closestMRTStation = "Redhill", timeToMRTStation =9.733333333 , MRTStationsIn10km = 63, closestPrimarySch = "Alexandra Primary School", timeToPrimarySch = 1.75, PrimarySchsIn10km = 31 , below1000Pop =8.5 , below1500Pop = 9.2, below2000Pop = 6.9, below2500Pop = 6.6, below3000Pop = 4.4, below4000Pop = 8.3, below5000Pop = 7, below6000Pop = 5.5, below7000Pop = 4.7, below8000Pop = 4.2, below9000Pop = 3, below10000Pop = 2.1, below11000Pop = 2.2, below12000Pop = 1.5, above12000Pop = 8)
+
+#target encoding for the categorical variables - month, area, flat_model, closestMall, closestBeach, closestMRTStation
+
+library(dplyr)
+calculate_mean_price <- function(data, select_col, target_var, value_of_interest) {
+  result <- data |>
+    group_by({{target_var}}) |>
+    summarise(mean_price = mean({{select_col}}))
+  
+  mean_price <- result[result[[as.character(substitute(target_var))]] == value_of_interest, "mean_price"]
+  return(mean_price)
+}
+
+mean_price_jan <- calculate_mean_price(resale, resale_price, month, "Jan")
+mean_price_area <- calculate_mean_price(resale, resale_price, area, "Bukit Merah")
+mean_price_flat_model <- calculate_mean_price(resale, resale_price, flat_model, "Model A")
+mean_price_mall <- calculate_mean_price(resale, resale_price, closestMall, "Tiong Bahru Plaza")
+mean_price_beach <- calculate_mean_price(resale, resale_price, closestBeach, "Palawan Beach")
+mean_price_mrt <- calculate_mean_price(resale, resale_price, closestMRTStation, "Redhill")
+mean_price_sch <- calculate_mean_price(resale, resale_price, closestPrimarySch, "Alexandra Primary School")
+
+#modify the new data 
+new_data$month_encoded <- mean_price_jan$mean_price
+new_data$area_encoded <- mean_price_area$mean_price
+new_data$flat_model_encoded <- mean_price_flat_model$mean_price
+new_data$closestMall_encoded <- mean_price_mall$mean_price
+new_data$closestBeach_encoded <- mean_price_beach$mean_price
+new_data$closestMRTStation_encoded <- mean_price_mrt$mean_price
+new_data$closestPrimarySch_encoded <- mean_price_sch$mean_price
+
+#prediction
+predict(boost.resale, newdata = new_data, n.trees = 2500)
+
+```
+
+
