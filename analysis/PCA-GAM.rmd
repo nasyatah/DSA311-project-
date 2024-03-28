@@ -1,0 +1,112 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+library(tidyverse)
+library(devtools)
+library(ggbiplot)
+library(remotes)
+```
+
+
+```{r}
+df = read.csv("C:/Users/bhara/Environments/DSA311-project/data/final_hdb_resale_2023.csv", stringsAsFactors = T)
+
+df = df[, 2:ncol(df)]
+
+df = df %>%
+  select(resale_price, month, area, lat, long, floor_area_sqm,  flat_model, remaining_lease, avg_storey, no_of_rooms, closestMall, timeToMall, mallsIn10km, closestBeach, timeToBeach, beachesIn10km, closestMRTStation, timeToMRTStation, MRTStationsIn10km, closestPrimarySch, timeToPrimarySch, PrimarySchsIn10km, below1000Pop, below1500Pop, below2000Pop, below2500Pop, below3000Pop, below4000Pop, below5000Pop, below6000Pop, below7000Pop, below8000Pop, below9000Pop, below10000Pop, below11000Pop, below12000Pop, above12000Pop)
+
+str(df)
+
+```
+
+# PCA
+```{r}
+
+catVars = c("month", "area", "flat_model", "closestMall", "closestBeach", "closestMRTStation", "closestPrimarySch")
+
+numericdf = select(df, -catVars)
+
+pcs = prcomp(numericdf, scale = TRUE)
+ggscreeplot(pcs) + theme_classic()
+ggbiplot(pcs, choices = c(1, 2), groups = df$area, circle = TRUE, varname.size = 2.5, varname.adjust = 1.25) + theme_classic()
+```
+
+# GAM
+
+```{r}
+
+for (i in 1:ncol(df)){
+  
+  if (!(colnames(df)[i] %in% catVars)){
+    linMod = lm(df[, "resale_price"] ~ poly(df[,i], 2, raw = T))
+    xSeq = cbind(1, seq(min(df[, i], na.rm = T), max(df[, i], na.rm = T)))
+    xSeq = cbind(xSeq, xSeq[,2]**2)
+  }
+  
+  fittedY = xSeq%*%matrix(linMod$coefficients)
+  plot(df[, i], df[, "resale_price"], xlab = colnames(df)[i])
+  lines(xSeq[,2], fittedY, col = "red", type = "l")
+}
+```
+
+```{r, Warning = FALSE}
+library(boot)
+library(gam)
+library(splines)
+set.seed(444)
+
+train = sample(nrow(df), 8000)
+test = -train
+
+spanLength = seq(0.25, 1, 0.25)
+degrees = seq(1, 6, 2)
+splineDf = seq(1, 20, 5)
+
+res = array(dim = c(length(spanLength), length(degrees), length(splineDf)))
+
+for (i in 1:length(spanLength)){
+  for (j in 1:length(degrees)){
+    for (k in 1:length(splineDf)){
+      gamObj = gam(resale_price ~ month + area + lo(lat, span = spanLength[i]) + lo(long, span = spanLength[i]) + poly(floor_area_sqm, degree = degrees[j]) +
+                   + flat_model + poly(remaining_lease, degree = degrees[j]) + poly(avg_storey, degree = degrees[j]) + no_of_rooms +
+                     ns(timeToMall, df = splineDf[k]) + ns(mallsIn10km, df = splineDf[k]) + ns(timeToBeach, df = splineDf[k]) + ns(beachesIn10km, df = splineDf[k]) +
+                     ns(timeToMRTStation, df = splineDf[k]) + ns(MRTStationsIn10km, df = splineDf[k]) + ns(timeToPrimarySch, df = splineDf[k]) +
+                     ns(PrimarySchsIn10km, df = splineDf[k]) + below1000Pop + below1500Pop + below2000Pop + below2500Pop + below3000Pop + below4000Pop +
+                     below5000Pop + below6000Pop + below7000Pop + below8000Pop + below9000Pop + below10000Pop + below11000Pop + below12000Pop +
+                     above12000Pop, data = df[train,])
+      yhat = predict(gamObj, df[test,])
+      res[i,j,k] = sqrt(mean((yhat - df[test,]$resale_price)**2))
+    }
+  }
+}
+
+multiRes = array(dim = c(2, length(spanLength), length(degrees), length(splineDf)))
+multiRes[1,,,] = res
+
+for (i in 1:length(spanLength)){
+  for (j in 1:length(degrees)){
+    for (k in 1:length(splineDf)){
+      gamObj = gam(resale_price ~ month + area*(lo(lat, span = spanLength[i]) + lo(long, span = spanLength[i]) + poly(floor_area_sqm, degree = degrees[j]) +
+                     flat_model + poly(remaining_lease, degree = degrees[j]) + poly(avg_storey, degree = degrees[j]) + no_of_rooms + 
+                     ns(timeToMall, df = splineDf[k]) + ns(mallsIn10km, df = splineDf[k]) + ns(timeToBeach, df = splineDf[k]) + ns(beachesIn10km, df = splineDf[k]) +
+                     ns(timeToMRTStation, df = splineDf[k]) + ns(MRTStationsIn10km, df = splineDf[k]) + ns(timeToPrimarySch, df = splineDf[k]) +
+                     ns(PrimarySchsIn10km, df = splineDf[k]) + below1000Pop + below1500Pop + below2000Pop + below2500Pop + below3000Pop + below4000Pop +
+                     below5000Pop + below6000Pop + below7000Pop + below8000Pop + below9000Pop + below10000Pop + below11000Pop + below12000Pop +
+                     above12000Pop), data = df[train,])
+      yhat = predict(gamObj, df[test,])
+      multiRes[2, i,j,k] = sqrt(mean((yhat - df[test,]$resale_price)**2))
+    }
+  }
+}
+
+which(multiRes == min(multiRes, na.rm = T), arr.ind = T)
+summary(gamObj)
+multiRes
+```
+
+
